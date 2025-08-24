@@ -9,6 +9,11 @@
 using namespace std;
 using Vec = vector<double>;
 
+// 定数定義
+const double EPSILON = 1e-16;        // 数値精度の閾値
+const double CONVERGENCE_THRESHOLD = 1e-12;  // 収束判定の閾値
+const double GAP_TOLERANCE = 1e-8;   // ギャップ収束の許容誤差
+
 // 内積
 double dot(const Vec &a, const Vec &b) {
     double s = 0;
@@ -19,7 +24,7 @@ double dot(const Vec &a, const Vec &b) {
 // 正規化
 void normalize(Vec &v) {
     double n = sqrt(dot(v, v));
-    if (n < 1e-16) return;
+    if (n < EPSILON) return;
     for (double &x : v) x /= n;
 }
 
@@ -30,7 +35,7 @@ void apply_H_half(const Vec &in, Vec &out, int L, double J = 1.0, bool periodic 
 
     for (int s = 0; s < dim; ++s) {
         double amp = in[s];
-        if (fabs(amp) < 1e-20) continue;
+        if (fabs(amp) < EPSILON) continue;
         for (int i = 0; i < L - 1 + (periodic ? 1 : 0); ++i) {
             int j = (i + 1) % L;
             // bit=1 -> up (m=+1/2), bit=0 -> down (m=-1/2)
@@ -71,7 +76,7 @@ void apply_H_one(const Vec &in, Vec &out, int L, double J = 1.0, bool periodic =
 
     for (int idx = 0; idx < dim; ++idx) {
         double amp = in[idx];
-        if (fabs(amp) < 1e-20) continue;
+        if (fabs(amp) < EPSILON) continue;
 
         // 各サイトの m 値を展開（-1,0,1）
         vector<int> m(L);
@@ -146,9 +151,9 @@ pair<double,double> lanczos_two_lowest(int dim, ApplyFunc apply_H_func, int max_
             for (int i = 0; i < dim; ++i) w[i] -= a * v[i] + beta_prev * v_prev[i];
         }
 
-        // 再正規直交（簡易的に前2つだけ）
+        // 再正規直交
         double b = sqrt(dot(w, w));
-        if (b < 1e-12) break;
+        if (b < CONVERGENCE_THRESHOLD) break;
 
         beta.push_back(b);
         // 準備次回
@@ -173,11 +178,15 @@ pair<double,double> lanczos_two_lowest(int dim, ApplyFunc apply_H_func, int max_
         // 最小2つを取る（Ritz 値）
         double E0 = evals[0];
         double E1 = (m >= 2 ? evals[1] : evals[0]);
-        // 収束判定（ギャップの変化が小さいなど）はここに入れられる
+        
+        // 収束判定：ギャップの変化が小さい場合に早期終了
         if (k > 5) {
-            // 簡易：収束したら抜ける（直前との差分が小さい）
-            // 比較例を入れてもよいが、ここでは max_it まで回す
-            ;
+            static double prev_gap = 0.0;
+            double current_gap = E1 - E0;
+            if (fabs(current_gap - prev_gap) < GAP_TOLERANCE) {
+                break;  // 収束したと判断して終了
+            }
+            prev_gap = current_gap;
         }
     }
 
@@ -202,6 +211,7 @@ int main(int argc, char **argv) {
     if (argc < 4) {
         cout << "Usage: ./haldane <spin: 0.5 or 1> <L_max> <lanczos_steps> [periodic=0/1] [L_min=4]\n";
         cout << "Example: ./haldane 0.5 12 50 0 4  # Spin-1/2, L=4 to 12, 50 Lanczos steps, OBC\n";
+        cout << "Note: Lanczos algorithm now includes convergence checking for early termination.\n";
         return 1;
     }
     double spin = atof(argv[1]);
@@ -238,7 +248,8 @@ int main(int argc, char **argv) {
             double gap_per_site = gap / L;
             cout << L << "\t" << E0 << "\t" << E1 << "\t" << gap << "\t" << E_per_site << "\t" << gap_per_site << "\n";
         } else {
-            cerr << "Unsupported spin. Only 0.5 and 1 are implemented.\n";
+            cerr << "Error: Unsupported spin value " << spin << ". Only 0.5 and 1 are implemented.\n";
+            cerr << "Please use 0.5 for spin-1/2 chains or 1.0 for spin-1 chains.\n";
             return 1;
         }
     }
