@@ -1,0 +1,46 @@
+# Compiled executables
+haldane
+*.exe
+*.out
+*.app
+
+# Object files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Temporary files
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build directories
+build/
+dist/
+*.build/
+
+# IDE files
+.vscode/
+.idea/
+*.vcxproj*
+*.sln
+
+# Output data files
+*.dat
+*.txt
+results/
+output/
+
+# Backup files
+*.bak
+*.backup

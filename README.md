@@ -1,0 +1,108 @@
+# Haldane Chain Simulation
+
+A C++ implementation for calculating ground state energies and energy gaps of spin-1/2 and spin-1 quantum chains using the Lanczos algorithm.
+
+## Overview
+
+This program simulates Heisenberg spin chains and analyzes their energy spectra, particularly focusing on the Haldane conjecture which predicts that integer spin chains have energy gaps while half-integer spin chains are gapless.
+
+## Features
+
+- **Spin-1/2 chains**: Exact diagonalization using bit representation
+- **Spin-1 chains**: Exact diagonalization using base-3 representation  
+- **Lanczos algorithm**: Efficient calculation of lowest eigenvalues
+- **Boundary conditions**: Support for both open (OBC) and periodic (PBC) boundary conditions
+- **Scaling analysis**: Calculate energy gaps as function of chain length
+
+## Physics Background
+
+The Hamiltonian for the Heisenberg spin chain is:
+
+```
+H = J Σᵢ (Sᵢˣ Sᵢ₊₁ˣ + Sᵢʸ Sᵢ₊₁ʸ + Sᵢᶻ Sᵢ₊₁ᶻ)
+```
+
+Where:
+- `J = 1.0` (antiferromagnetic coupling)
+- `Sᵢᵅ` are spin operators at site i
+- Sum runs over nearest neighbors
+
+## Requirements
+
+- C++17 or later
+- Eigen3 library for matrix operations
+- Standard C++ libraries
+
+## Compilation
+
+```bash
+g++ -std=c++17 -O3 -I/path/to/eigen3 haldane.cpp -o haldane
+```
+
+Or use the provided Makefile:
+```bash
+make
+```
+
+## Usage
+
+```bash
+./haldane <spin> <L_max> <lanczos_steps> [periodic] [L_min]
+```
+
+### Parameters
+
+- `spin`: Spin value (0.5 or 1)
+- `L_max`: Maximum chain length
+- `lanczos_steps`: Number of Lanczos iterations
+- `periodic`: Boundary conditions (0=OBC, 1=PBC) [optional, default=0]
+- `L_min`: Minimum chain length [optional, default=4]
+
+### Examples
+
+```bash
+# Spin-1/2 chain, L=4 to 12, open boundary conditions
+./haldane 0.5 12 50 0 4
+
+# Spin-1 chain, L=4 to 10, periodic boundary conditions  
+./haldane 1 10 100 1 4
+```
+
+## Output Format
+
+The program outputs a table with columns:
+- `L`: Chain length
+- `Ground_E`: Ground state energy
+- `1st_excited_E`: First excited state energy
+- `Gap`: Energy gap (E₁ - E₀)
+- `E_per_site`: Ground state energy per site
+- `Gap_per_site`: Energy gap per site
+
+## Expected Results
+
+### Spin-1/2 Chains
+- Gapless in thermodynamic limit
+- Gap scales as ~1/L for finite systems
+- Ground state energy per site → -ln(2) ≈ -0.693
+
+### Spin-1 Chains (Haldane Gap)
+- Finite gap in thermodynamic limit (~0.41)
+- Exponential decay of correlations
+- Ground state energy per site → -1.401
+
+## Implementation Details
+
+- **Spin-1/2**: States encoded as bit strings (2^L dimension)
+- **Spin-1**: States encoded in base-3 (3^L dimension)
+- **Lanczos**: Symmetric tridiagonal matrix diagonalization
+- **Memory**: Optimized for large system sizes
+
+## References
+
+1. Haldane, F.D.M. "Nonlinear field theory of large-spin Heisenberg antiferromagnets" (1983)
+2. White, S.R. "Density matrix formulation for quantum renormalization groups" (1992)
+3. Affleck, I. "Quantum spin chains and the Haldane gap" (1989)
+
+## License
+
+MIT License - see LICENSE file for details.
