@@ -35,13 +35,18 @@ Where:
 
 ## Compilation
 
+### Manual compilation:
 ```bash
 g++ -std=c++17 -O3 -I/path/to/eigen3 haldane.cpp -o haldane
 ```
 
-Or use the provided Makefile:
+### Using Makefile (recommended):
 ```bash
-make
+make                    # Build optimized version
+make debug              # Build debug version with symbols
+make test               # Run comprehensive test suite
+make help               # Show all available options
+make version            # Show version information
 ```
 
 ## Usage
@@ -94,14 +99,24 @@ The program outputs a table with columns:
 
 - **Spin-1/2**: States encoded as bit strings (2^L dimension)
 - **Spin-1**: States encoded in base-3 (3^L dimension)
-- **Lanczos**: Symmetric tridiagonal matrix diagonalization
+- **Lanczos**: Symmetric tridiagonal matrix diagonalization with convergence checking
 - **Memory**: Optimized for large system sizes
+- **Error Handling**: Comprehensive error messages and input validation
+- **Constants**: Well-defined numerical thresholds for stability
 
 ## References
 
 1. Haldane, F.D.M. "Nonlinear field theory of large-spin Heisenberg antiferromagnets" (1983)
 2. White, S.R. "Density matrix formulation for quantum renormalization groups" (1992)
 3. Affleck, I. "Quantum spin chains and the Haldane gap" (1989)
+
+## Recent Updates
+
+### Version 1.0.0
+- Added convergence checking in Lanczos algorithm
+- Improved error handling and user feedback
+- Enhanced Makefile with debug build and comprehensive tests
+- Added version information and better documentation
 
 ## License
 
