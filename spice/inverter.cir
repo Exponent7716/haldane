@@ -1,0 +1,22 @@
+* CMOS inverter propagation delay (generic Level-1 models, ~0.18um-like)
+.param VDD=1.8 CL=20f Wn=0.5u Wp=1.0u L=0.18u
+
+.model NMOS nmos level=1 vto=0.5  kp=170u gamma=0.4 lambda=0.05 phi=0.8 tox=4n cgso=3e-10 cgdo=3e-10 cj=1e-3 cjsw=2e-10
+.model PMOS pmos level=1 vto=-0.5 kp=60u  gamma=0.4 lambda=0.05 phi=0.8 tox=4n cgso=3e-10 cgdo=3e-10 cj=1e-3 cjsw=2e-10
+
+Vdd vdd 0 {VDD}
+* input: 100ps rise/fall, 2ns period
+Vin in 0 PULSE(0 {VDD} 0.5n 100p 100p 1n 2n)
+
+Mp out in vdd vdd PMOS W={Wp} L={L} AD={Wp*0.5u} AS={Wp*0.5u} PD={2*Wp+1u} PS={2*Wp+1u}
+Mn out in 0   0   NMOS W={Wn} L={L} AD={Wn*0.5u} AS={Wn*0.5u} PD={2*Wn+1u} PS={2*Wn+1u}
+Cl  out 0 {CL}
+
+.tran 1p 4n
+
+.meas tran tphl TRIG v(in) VAL=0.9 RISE=1 TARG v(out) VAL=0.9 FALL=1
+.meas tran tplh TRIG v(in) VAL=0.9 FALL=1 TARG v(out) VAL=0.9 RISE=1
+.meas tran tpd  param='(tphl+tplh)/2'
+.meas tran trise TRIG v(out) VAL=0.18 RISE=1 TARG v(out) VAL=1.62 RISE=1
+.meas tran tfall TRIG v(out) VAL=1.62 FALL=1 TARG v(out) VAL=0.18 FALL=1
+.end
