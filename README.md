@@ -121,3 +121,10 @@ The program outputs a table with columns:
 ## License
 
 MIT License - see LICENSE file for details.
+
+## DUV Lithography Scanner Simulator
+
+The [`duv/`](duv/) directory contains a separate Python package that models an
+ArF immersion (193 nm) DUV lithography scanner subsystem by subsystem: laser,
+illuminator, reticle, projection lens, stages, resist and on-board metrology.
+See [`duv/README.md`](duv/README.md).
