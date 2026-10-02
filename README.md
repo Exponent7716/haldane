@@ -27,6 +27,20 @@ Where:
 - `Sᵢᵅ` are spin operators at site i
 - Sum runs over nearest neighbors
 
+## SYK Model Simulation
+
+`syk.cpp` performs exact diagonalization of the Majorana SYK (q=4) model
+`H = Σ J_abcd χ_a χ_b χ_c χ_d`, `<J²> = 3! J²/N³` (no Eigen needed).
+
+```bash
+make syk
+./syk <N> [samples=10] [seed=1] [J=1] [dump_spectrum=0]   # N even, 4..24
+./syk 16 50 1
+```
+
+Outputs E0/N, gap, bandwidth and the level-spacing ratio <r>
+(GOE 0.531 for N%8=0, GUE 0.600 for N%8=2,6, GSE 0.674 for N%8=4).
+
 ## Requirements
 
 - C++17 or later
