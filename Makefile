@@ -21,12 +21,18 @@ ifdef EIGEN_PATH_OVERRIDE
     CXXFLAGS += -I$(EIGEN_PATH_OVERRIDE)
 endif
 
-.PHONY: syk test-syk all debug clean install test help version
+.PHONY: mq syk test-mq test-syk all debug clean install test help version
 
-all: $(TARGET) syk
+all: $(TARGET) syk mq
+
+mq: mq.cpp
+	$(CXX) -std=c++17 -O3 -Wall -Wextra mq.cpp -o mq
 
 syk: syk.cpp
 	$(CXX) -std=c++17 -O3 -Wall -Wextra syk.cpp -o syk
+
+test-mq: mq
+	./mq 8 5 1 0 0.1 0.5 3
 
 test-syk: syk
 	./syk 12 20 1
@@ -39,7 +45,7 @@ debug: $(SOURCE)
 	$(CXX) $(DEBUG_FLAGS) $(SOURCE) -o $(TARGET)_debug
 
 clean:
-	rm -f $(TARGET) $(TARGET)_debug syk
+	rm -f $(TARGET) $(TARGET)_debug syk mq
 
 install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/

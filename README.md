@@ -51,6 +51,22 @@ Checks: G(0)=1/2 and G(τ)=G(β-τ). Compare with the large-N conformal result
 Outputs E0/N, gap, bandwidth and the level-spacing ratio <r>
 (GOE 0.531 for N%8=0, GUE 0.600 for N%8=2,6, GSE 0.674 for N%8=4).
 
+## Maldacena-Qi Model (coupled SYK)
+
+`mq.cpp` simulates two SYK models coupled by a mass term,
+`H = H_L + H_R + i μ Σ_j χ_L^j χ_R^j` (J_R fixed by the TFD condition), with N Majoranas per side (Hilbert space 2^N, N ≤ 12).
+
+```bash
+make mq
+./mq <N> <samples> <seed> <tmax> <mu1> [mu2 ...]
+./mq 10 5 1 0 0.05 0.1 0.2 0.5 1     # μ scan
+./mq 10 3 1 20 0.2                   # also real-time G_LL(t), G_LR(t) up to t=20
+```
+
+Per μ it prints E0/N, the lowest excitation energies (gap), ⟨Z⟩ (= -2⟨iχ_Lχ_R⟩),
+the maximal overlap |⟨TFD_β|GS⟩|² (and the optimal β*), and optionally the real-time correlators.
+Persistent oscillation of G(t) at frequency ≈ gap signals the traversable wormhole.
+
 ## Requirements
 
 - C++17 or later
