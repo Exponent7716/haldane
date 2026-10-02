@@ -38,6 +38,16 @@ make syk
 ./syk 16 50 1
 ```
 
+Add an inverse temperature to also compute the Euclidean Green function
+`G(τ) = (1/N) Σ_a <χ_a(τ) χ_a(0)>_β` (full-space diagonalization, N ≤ 16):
+
+```bash
+./syk 12 20 1 1 0 10     # N=12, 20 samples, seed=1, J=1, no spectrum dump, beta=10
+```
+
+Checks: G(0)=1/2 and G(τ)=G(β-τ). Compare with the large-N conformal result
+`G = b (π/(βJ sin(πτ/β)))^(1/2)`, `b=(4π)^(-1/4)`.
+
 Outputs E0/N, gap, bandwidth and the level-spacing ratio <r>
 (GOE 0.531 for N%8=0, GUE 0.600 for N%8=2,6, GSE 0.674 for N%8=4).
 

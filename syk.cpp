@@ -109,13 +109,13 @@ void symmetric_eigenvalues(Mat a, vector<double> &d) {
     sort(d.begin(), d.end());
 }
 
-// SYK のランダム実現1つを作り、偶パリティ部分空間の固有値(縮退除去済み)を返す
-vector<double> syk_spectrum(int N, double J, mt19937_64 &rng) {
+// SYK ハミルトニアンを作る。full=false: 偶パリティ部分空間, full=true: 全空間
+vector<vector<cplx>> build_hamiltonian(int N, double J, mt19937_64 &rng, bool full) {
     int nsp = N / 2;
     vector<uint32_t> basis;
     vector<int> index(1u << nsp, -1);
     for (uint32_t s = 0; s < (1u << nsp); ++s)
-        if (!(__builtin_popcount(s) & 1)) { index[s] = basis.size(); basis.push_back(s); }
+        if (full || !(__builtin_popcount(s) & 1)) { index[s] = basis.size(); basis.push_back(s); }
     int n = basis.size();
 
     double sigma = sqrt(6.0 * J * J / ((double)N * N * N));
@@ -137,8 +137,12 @@ vector<double> syk_spectrum(int N, double J, mt19937_64 &rng) {
             H[index[s]][i] += ph;
         }
     }
+    return H;
+}
 
-    // 実対称埋め込み
+// エルミート行列 A+iB を実対称行列 [[A,-B],[B,A]] に埋め込む
+Mat embed_real(const vector<vector<cplx>> &H) {
+    int n = H.size();
     Mat R(2 * n, vector<double>(2 * n));
     for (int i = 0; i < n; ++i)
         for (int j = 0; j < n; ++j) {
@@ -147,6 +151,12 @@ vector<double> syk_spectrum(int N, double J, mt19937_64 &rng) {
             R[i + n][j] = im;
             R[i][j + n] = -im;
         }
+    return R;
+}
+
+// SYK のランダム実現1つを作り、偶パリティ部分空間の固有値(縮退除去済み)を返す
+vector<double> syk_spectrum(int N, double J, mt19937_64 &rng) {
+    Mat R = embed_real(build_hamiltonian(N, J, rng, false));
     vector<double> ev;
     symmetric_eigenvalues(R, ev);
 
@@ -155,6 +165,92 @@ vector<double> syk_spectrum(int N, double J, mt19937_64 &rng) {
         if (out.empty() || ev[i] - out.back() > DEGENERACY_TOL) out.push_back(ev[i]);
     }
     return out;
+}
+
+// 巡回ヤコビ法: 固有値 d と固有ベクトル(Vt の行 k が固有値 d[k] の固有ベクトル)
+void jacobi_eigen(Mat A, vector<double> &d, Mat &Vt) {
+    int n = A.size();
+    Vt.assign(n, vector<double>(n, 0.0));
+    for (int i = 0; i < n; ++i) Vt[i][i] = 1.0;
+    for (int sweep = 0; sweep < 50; ++sweep) {
+        double off = 0, diag = 0;
+        for (int i = 0; i < n; ++i) {
+            diag += A[i][i] * A[i][i];
+            for (int j = i + 1; j < n; ++j) off += A[i][j] * A[i][j];
+        }
+        if (off < 1e-26 * (diag + off)) break;
+        for (int p = 0; p < n - 1; ++p)
+        for (int q = p + 1; q < n; ++q) {
+            double apq = A[p][q];
+            if (fabs(apq) < 1e-300) continue;
+            double tau = (A[q][q] - A[p][p]) / (2.0 * apq);
+            double t = (tau >= 0 ? 1.0 : -1.0) / (fabs(tau) + sqrt(1.0 + tau * tau));
+            double c = 1.0 / sqrt(1.0 + t * t), sn = t * c;
+            for (int k = 0; k < n; ++k) {
+                if (k == p || k == q) continue;
+                double akp = A[k][p], akq = A[k][q];
+                A[k][p] = A[p][k] = c * akp - sn * akq;
+                A[k][q] = A[q][k] = sn * akp + c * akq;
+            }
+            A[p][p] -= t * apq;
+            A[q][q] += t * apq;
+            A[p][q] = A[q][p] = 0.0;
+            for (int k = 0; k < n; ++k) {
+                double vp = Vt[p][k], vq = Vt[q][k];
+                Vt[p][k] = c * vp - sn * vq;
+                Vt[q][k] = sn * vp + c * vq;
+            }
+        }
+    }
+    d.resize(n);
+    for (int i = 0; i < n; ++i) d[i] = A[i][i];
+}
+
+// Euclid 時間グリーン関数 G(tau) = (1/N) sum_a <chi_a(tau) chi_a(0)>_beta を
+// 1 つの実現について計算し、grid.size() 個の tau でのサンプル値 acc に加える。
+// 全空間(パリティ偶+奇)で対角化。実埋め込みでは Tr_C = Tr_R / 2 なので比は不変。
+void syk_green(int N, double J, double beta, int M, mt19937_64 &rng, vector<double> &acc) {
+    int nsp = N / 2, dim = 1 << nsp;
+    Mat R = embed_real(build_hamiltonian(N, J, rng, true));
+    int n = R.size();
+    vector<double> E; Mat Vt;
+    jacobi_eigen(R, E, Vt);
+    double E0 = *min_element(E.begin(), E.end());
+
+    // S_ij = sum_a (<i| chi_a |j>)^2  (実埋め込み)
+    Mat S(n, vector<double>(n, 0.0));
+    Mat XV(n, vector<double>(n));
+    for (int a = 0; a < N; ++a) {
+        // XV の行 k = X * (固有ベクトル k)。X は疎(各列に非零 1 つ)。
+        for (int k = 0; k < n; ++k) {
+            const vector<double> &v = Vt[k];
+            vector<double> &o = XV[k];
+            fill(o.begin(), o.end(), 0.0);
+            for (uint32_t s = 0; s < (uint32_t)dim; ++s) {
+                cplx ph = 1.0;
+                uint32_t s2 = apply_chi(a, s, ph);
+                // 複素係数 ph=(re+i im) による (x,y) -> ((re x - im y), (im x + re y))
+                double re = ph.real(), im = ph.imag();
+                o[s2]       += re * v[s] - im * v[s + dim];
+                o[s2 + dim] += im * v[s] + re * v[s + dim];
+            }
+        }
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j) {
+                double x = 0;
+                for (int k = 0; k < n; ++k) x += Vt[i][k] * XV[j][k];
+                S[i][j] += x * x;
+            }
+    }
+    double Z = 0;
+    for (int i = 0; i < n; ++i) Z += exp(-beta * (E[i] - E0));
+    for (int m = 0; m < M; ++m) {
+        double tau = beta * m / (M - 1), g = 0;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                g += S[i][j] * exp(-(beta - tau) * (E[i] - E0) - tau * (E[j] - E0));
+        acc[m] += g / (N * Z);
+    }
 }
 
 // 隣接準位間隔比 <r> (GOE≈0.5307, GUE≈0.5996, GSE≈0.6744)
@@ -174,7 +270,8 @@ double spacing_ratio(const vector<double> &E) {
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         cout << "Usage: " << argv[0] << " <N> [samples=10] [seed=1] [J=1] [dump_spectrum=0]\n"
-             << "  N: Majorana 数 (偶数, 4..24)\n";
+             << "  N: Majorana 数 (偶数, 4..24)\n"
+             << "  beta>0 を渡すとグリーン関数も計算 (N<=16): ./syk N samples seed J dump beta\n";
         return 1;
     }
     int N = atoi(argv[1]);
@@ -182,6 +279,7 @@ int main(int argc, char *argv[]) {
     unsigned long seed = argc > 3 ? strtoul(argv[3], nullptr, 10) : 1;
     double J = argc > 4 ? atof(argv[4]) : 1.0;
     bool dump = argc > 5 && atoi(argv[5]) != 0;
+    double beta = argc > 6 ? atof(argv[6]) : 0.0;
     if (N < 4 || N > 24 || N % 2 != 0 || samples < 1) {
         cerr << "Error: N は 4..24 の偶数、samples >= 1 にしてください\n";
         return 1;
@@ -211,5 +309,17 @@ int main(int argc, char *argv[]) {
     cout << "bandwidth   = " << sumBand / samples << "\n";
     cout << "<r>         = " << sumR / samples
          << "   (GOE 0.5307 [N%8=0], GUE 0.5996 [N%8=2,6], GSE 0.6744 [N%8=4])\n";
+
+    if (beta > 0) {
+        if (N > 16) { cerr << "Error: グリーン関数は N<=16 のみ\n"; return 1; }
+        const int M = 21;
+        vector<double> G(M, 0.0);
+        mt19937_64 rng2(seed);
+        for (int s = 0; s < samples; ++s) syk_green(N, J, beta, M, rng2, G);
+        cout << "\n# Euclid Green function G(tau) = (1/N) sum_a <chi_a(tau) chi_a(0)>, beta=" << beta
+             << "   (check: G(0)=0.5, G(tau)=G(beta-tau); large-N conformal: G = b (pi/(beta J sin(pi tau/beta)))^(1/2), b=(4pi)^(-1/4))\n"
+             << "# tau/beta   G(tau)\n" << setprecision(6);
+        for (int m = 0; m < M; ++m) cout << (double)m / (M - 1) << "  " << G[m] / samples << "\n";
+    }
     return 0;
 }
