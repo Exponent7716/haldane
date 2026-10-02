@@ -44,3 +44,9 @@ output/
 # Backup files
 *.bak
 *.backup
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+duv/examples/output/

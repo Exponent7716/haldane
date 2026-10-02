@@ -1,0 +1,13 @@
+[project]
+name = "duv"
+version = "0.1.0"
+description = "Physics-level simulator of an ArF immersion DUV lithography scanner"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy"]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
