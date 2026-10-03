@@ -62,8 +62,11 @@ sites this is a rough number, not converged in `nb`).
 
 * Only the **local** vertex is used (no non-local DΓA corrections), so `chi(q)` is
   DMFT-level: it has a finite-temperature Néel transition in 2D (violating Mermin–Wagner).
-* ED with few bath sites: `G_loc` and `G_imp` differ by the bath-fit error (0.4% for
-  `nb = 2`, 0.02% for `nb = 3`), which the magnetic channel near `T_N` amplifies.
+* Self-consistency check not fully closed: the q-average of `chi_m` exceeds the impurity
+  value by ~5.6% at beta = 2 (charge channel: 0.2%). This is **not** the bath-fit error:
+  going from `nb = 2` to `nb = 3` reduces |G_loc - G_imp|/|G_imp| from 3.6e-3 to 2.4e-4
+  but leaves the discrepancy unchanged (5.7% -> 5.6%). Suspects: the constant-`-U`
+  asymptotics outside the box and the neglected omega = +-omega' ridges of `Gamma`. Open.
 * Cost: the 4-point Lehmann sum scales as `(#bath states)^3 x (2N)^2`; `nb = 2`, `N = 12`
   takes ~45 s per temperature, `nb = 3` is several times slower.
 * Particle-hole symmetric (half filling) only, `nu = 0` tested most (other `nu_l` are supported
