@@ -33,7 +33,7 @@ for p, q in path:
 kcart = np.vstack(kcart); xs = np.concatenate(xs)
 t = time.time()
 E = np.zeros((len(kcart), cell.nao_nr()))
-nb = 4
+nb = 1
 for i0 in range(0, len(kcart), nb):  # batches -> progress + partial saves
     ks = kcart[i0:i0+nb]
     e, _ = fresh_mf().get_bands(ks * 2*np.pi/B, kpts=kpts)
