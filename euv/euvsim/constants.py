@@ -32,6 +32,7 @@ OPTICAL_CONSTANTS_13P5 = {
     "TaBN": (0.9500, 0.03100),     # classic absorber
     "TaBO": (0.9600, 0.02600),     # absorber ARC
     "Ni": (0.9480, 0.07270),       # high-k absorber candidate
+    "RuO2": (0.9000, 0.02100),     # oxidised Ru cap (estimate)
     "Sn": (0.9300, 0.07200),
     "C": (0.9616, 0.00691),        # carbon contamination
     "H2": (1.0, 0.0),              # gas: use absorption cross-section instead
