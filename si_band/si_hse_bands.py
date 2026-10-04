@@ -14,9 +14,12 @@ cell.basis = "gth-dzvp"; cell.pseudo = "gth-pbe"; cell.verbose = 3
 cell.build()
 
 kpts = cell.make_kpts([4]*3)
-mf = dft.KRKS(cell, kpts=kpts).density_fit()
-mf.xc = "hse06"
-mf.__dict__.update(lib.chkfile.load("si_hse.chk", "scf"))
+def fresh_mf():
+    # fresh DF object per batch: reusing one after get_bands rebuilds j3c on a huge supercell
+    m = dft.KRKS(cell, kpts=kpts).density_fit()
+    m.xc = "hse06"
+    m.__dict__.update(lib.chkfile.load("si_hse.chk", "scf"))
+    return m
 
 pts = {"L": [.5, .5, .5], "G": [0, 0, 0], "X": [0, 1, 0], "U": [.25, 1, .25], "K": [.75, .75, 0]}
 path = [("L", "G"), ("G", "X"), ("X", "U"), ("K", "G")]
@@ -30,10 +33,14 @@ for p, q in path:
 kcart = np.vstack(kcart); xs = np.concatenate(xs)
 t = time.time()
 E = np.zeros((len(kcart), cell.nao_nr()))
-for i, k in enumerate(kcart):  # one k at a time -> progress + resumable
-    e, _ = mf.get_bands(k[None] * 2*np.pi/B, kpts=kpts)
-    E[i] = np.sort(e[0]) * HARTREE2EV
-    np.savez("si_hse_bands.npz", E=E[:i+1], xs=xs[:i+1], kcart=kcart[:i+1], nocc=cell.nelectron//2)
-    print(f"k {i+1}/{len(kcart)} done t={time.time()-t:.0f}s", flush=True)
+nb = 4
+for i0 in range(0, len(kcart), nb):  # batches -> progress + partial saves
+    ks = kcart[i0:i0+nb]
+    e, _ = fresh_mf().get_bands(ks * 2*np.pi/B, kpts=kpts)
+    for j, ej in enumerate(e):
+        E[i0+j] = np.sort(ej) * HARTREE2EV
+    n = i0 + len(ks)
+    np.savez("si_hse_bands.npz", E=E[:n], xs=xs[:n], kcart=kcart[:n], nocc=cell.nelectron//2)
+    print(f"k {n}/{len(kcart)} done t={time.time()-t:.0f}s", flush=True)
 no = cell.nelectron // 2
 print(f"HSE06 indirect gap = {E[:, no].min() - E[:, no-1].max():.3f} eV", flush=True)
