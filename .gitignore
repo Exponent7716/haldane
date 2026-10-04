@@ -46,3 +46,4 @@ output/
 *.backup
 si_band/*.chk
 si_band/run.log
+si_band/converge.log
