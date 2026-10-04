@@ -51,3 +51,4 @@ si_band/hse.log
 si_band/*.npz
 si_band/hse_bands.log
 si_band/*.chk
+si_band/gw*.log
