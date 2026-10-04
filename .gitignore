@@ -49,3 +49,5 @@ si_band/run.log
 si_band/converge.log
 si_band/hse.log
 si_band/*.npz
+si_band/hse_bands.log
+si_band/*.chk
