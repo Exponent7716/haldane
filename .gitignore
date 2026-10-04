@@ -47,3 +47,5 @@ output/
 si_band/*.chk
 si_band/run.log
 si_band/converge.log
+si_band/hse.log
+si_band/*.npz
