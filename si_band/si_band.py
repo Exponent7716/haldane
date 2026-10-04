@@ -56,6 +56,7 @@ print(f"VBM at x={xs[iv]:.3f} k={kcart[iv]}  CBM at x={xs[ic]:.3f} k={kcart[ic]}
 print(f"Indirect gap (PBE/gth-dzvp) = {cbm - vbm:.3f} eV")
 print(f"Gamma direct gap = {E[nseg, nocc]-E[nseg, nocc-1]:.3f} eV")
 
+np.savez("si_pbe_bands.npz", E=E, xs=xs, kcart=kcart, nocc=nocc)
 E -= vbm
 fig, ax = plt.subplots(figsize=(5, 6))
 for b in range(nocc + 4):

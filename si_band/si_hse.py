@@ -1,4 +1,9 @@
-"""Si band structure with HSE06 (PySCF periodic DFT, gth-dzvp, 4x4x4 SCF)."""
+"""Si HSE06 SCF on a 4x4x4 mesh (PySCF periodic DFT, gth-dzvp); eigenvalues saved in si_hse.chk.
+
+Note: mf.get_bands() at k-points incommensurate with the SCF mesh makes PySCF build a huge
+supercell for the range-separated exchange (43 GiB) and fail; plot_compare.py therefore
+interpolates the HSE06-PBE correction from the mesh instead.
+"""
 import sys, time, numpy as np
 from pyscf.pbc import gto, dft
 from pyscf.data.nist import HARTREE2EV
@@ -20,20 +25,3 @@ mf.xc = "hse06"
 mf.chkfile = "si_hse.chk"
 mf.kernel()
 print(f"HSE06 SCF converged={mf.converged} E={mf.e_tot:.6f} t={time.time()-t:.0f}s", flush=True)
-
-pts = {"L": [.5, .5, .5], "G": [0, 0, 0], "X": [0, 1, 0], "U": [.25, 1, .25], "K": [.75, .75, 0]}
-path = [("L", "G"), ("G", "X"), ("X", "U"), ("K", "G")]
-nseg = 20
-kcart, xs, x0 = [], [], 0.0
-for p, q in path:
-    P, Q = np.array(pts[p]), np.array(pts[q])
-    d = np.linalg.norm(Q - P); s = np.linspace(0, 1, nseg)
-    kcart.append(P + s[:, None]*(Q - P)); xs.append(x0 + s*d)
-    x0 += d
-kcart = np.vstack(kcart); xs = np.concatenate(xs)
-e_k, _ = mf.get_bands(kcart * 2*np.pi/B, kpts=kpts)
-E = np.array([np.sort(e) for e in e_k]) * HARTREE2EV
-no = cell.nelectron // 2
-np.savez("si_hse_bands.npz", E=E, xs=xs, kcart=kcart, nocc=no)
-print(f"HSE06 indirect gap = {E[:, no].min() - E[:, no-1].max():.3f} eV  "
-      f"Gamma direct = {E[nseg, no] - E[nseg, no-1]:.3f} eV", flush=True)
