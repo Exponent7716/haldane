@@ -121,3 +121,7 @@ The program outputs a table with columns:
 ## License
 
 MIT License - see LICENSE file for details.
+
+## EUV Lithography Scanner Simulator
+
+This repository also contains [`euv/`](euv/README.md): a physics-based simulator of a complete EUV lithography scanner (LPP source, illuminator, reflective mask, projection optics, resist, stages and vacuum/thermal environment).

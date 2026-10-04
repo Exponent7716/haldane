@@ -30,6 +30,7 @@ def test_throughput_falls_with_dose(low_na):
     assert w[0] >= w[1] > w[2]
     assert 50 < w[0] < 250
     assert low_na.throughput(80)["limited_by"] == "source"
+    assert 50 < low_na.throughput(20)["n_fields"] < 130
 
 
 def test_high_na_has_less_power_at_wafer(low_na):
@@ -47,3 +48,10 @@ def test_end_to_end_lines_print_at_target(low_na):
 def test_low_na_cannot_print_16nm_pitch(low_na):
     r = low_na.print_lines(16, 8, dose_mj_cm2=40, stochastic=False)
     assert r["image_contrast"] < 0.05
+
+
+def test_gas_and_thermal_from_environment(low_na):
+    assert 0.8 < low_na.gas_transmission() < 1.0
+    th = low_na.thermal_state()
+    assert th["reticle_dT_K"] > 0
+    assert 0.5 < low_na.overlay_budget_nm() < 5

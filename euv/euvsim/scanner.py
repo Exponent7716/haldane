@@ -17,21 +17,13 @@ from typing import Optional
 import numpy as np
 
 from .constants import FIELD_SIZE_MM, SLIT_WIDTH_MM
+from .environment import ScannerEnvironment
 from .illumination import Illuminator
 from .imaging import Pellicle, ProjectionOptics, ReflectiveMask, aerial_image, line_space
 from .imaging import nils as image_nils
 from .resist import CAR, ResistMaterial, ResistProcess
 from .source import LPPSource
-
-
-@dataclass
-class ExposureTimeline:
-    """Simple step-and-scan timeline (overridden by ``euvsim.stage`` when present)."""
-
-    max_scan_speed_m_s: float = 0.8        # wafer-stage limit (reticle runs 4x faster)
-    step_time_s: float = 0.10              # step + settle between fields
-    wafer_overhead_s: float = 9.0          # swap, align, level (overlapped by dual stage)
-    n_fields: int = 96                     # full 26x33 mm fields on a 300 mm wafer
+from .stage import MotionLimits, TimelineParams, matched_machine_overlay_budget, throughput_wph
 
 
 @dataclass
@@ -45,8 +37,9 @@ class EUVScanner:
     resist: ResistMaterial = field(default_factory=lambda: CAR)
     illumination: str = "dipole"
     illumination_params: dict = field(default_factory=lambda: {"orientation": "x"})
-    timeline: ExposureTimeline = field(default_factory=ExposureTimeline)
-    gas_transmission: float = 0.97         # H2 absorption IF -> wafer
+    stage_limits: MotionLimits = field(default_factory=MotionLimits)
+    timeline: TimelineParams = field(default_factory=TimelineParams)
+    environment: ScannerEnvironment = field(default_factory=ScannerEnvironment)
     slit_height_mm: float = 2.0
     seed: int = 0
 
@@ -54,7 +47,6 @@ class EUVScanner:
     def high_na(cls, **kw) -> "EUVScanner":
         """EXE:5000-class: NA 0.55, anamorphic 4x/8x, half field."""
         kw.setdefault("optics", ProjectionOptics.high_na())
-        kw.setdefault("timeline", ExposureTimeline(max_scan_speed_m_s=0.8, n_fields=192))
         return cls(**kw)
 
     # ---------------------------------------------------------------- photons
@@ -65,6 +57,11 @@ class EUVScanner:
     def illuminate(self):
         return self.illuminator().illuminate(self.illumination, **self.illumination_params)
 
+    def gas_transmission(self) -> float:
+        """H2 transmission IF -> wafer (source->IF absorption is in the source model)."""
+        segs = self.environment.gas_segments()
+        return float(np.prod([g.transmission() for g in segs if g.name != "source->IF"]))
+
     def photon_budget(self) -> dict:
         """Power (W) at each plane and the transmission of each stage."""
         p_if = self.source.inband_power_at_if_w()
@@ -74,10 +71,11 @@ class EUVScanner:
         t_pel = self.pellicle.double_pass_transmission() if self.pellicle else 1.0
         t_pob = self.optics.transmission()
         p_ret = p_if * t_ill
-        p_wafer = p_ret * r_mask * t_pel * t_pob * self.gas_transmission
+        t_gas = self.gas_transmission()
+        p_wafer = p_ret * r_mask * t_pel * t_pob * t_gas
         return {"P_IF_W": p_if, "T_illuminator": t_ill, "P_reticle_W": p_ret,
                 "R_mask": r_mask, "T_pellicle": t_pel, "T_POB": t_pob,
-                "T_gas": self.gas_transmission, "P_wafer_W": p_wafer,
+                "T_gas": t_gas, "P_wafer_W": p_wafer,
                 "IF_to_wafer": p_wafer / p_if}
 
     # -------------------------------------------------------------- throughput
@@ -90,21 +88,26 @@ class EUVScanner:
     def throughput(self, dose_mj_cm2: float) -> dict:
         """Wafers per hour at ``dose_mj_cm2`` (source-limited or stage-limited).
 
-        Dose D at a wafer point is P/(W·h) · (h/v) = P/(W·v) so the
-        source-limited scan speed is v = P_wafer / (D · W_slit).
+        Dose D at a wafer point is P/(W·h) · (h/v) = P/(W·v), so the
+        source-limited scan speed is v = P_wafer / (D · W_slit); the wafer
+        timeline (scan, step, settle, dual-stage measure side) comes from
+        :mod:`euvsim.stage`.
         """
         p_wafer = self.photon_budget()["P_wafer_W"]
-        w_slit_m = SLIT_WIDTH_MM * 1e-3
-        dose_j_m2 = dose_mj_cm2 * 10.0
-        v_src = p_wafer / (dose_j_m2 * w_slit_m)
-        tl = self.timeline
-        v = min(v_src, tl.max_scan_speed_m_s)
-        _, fy = self.field_size_mm()
-        t_scan = (fy + self.slit_height_mm) * 1e-3 / v
-        t_wafer = tl.n_fields * (t_scan + tl.step_time_s) + tl.wafer_overhead_s
-        return {"dose_mJ_cm2": dose_mj_cm2, "P_wafer_W": p_wafer, "scan_speed_m_s": v,
-                "limited_by": "source" if v_src < tl.max_scan_speed_m_s else "stage",
-                "t_field_s": t_scan, "t_wafer_s": t_wafer, "WPH": 3600.0 / t_wafer}
+        v_src = p_wafer / (dose_mj_cm2 * 10.0 * SLIT_WIDTH_MM * 1e-3)
+        tl = throughput_wph(dose_mj_cm2, p_wafer, self.stage_limits, self.timeline,
+                            self.field_size_mm(), SLIT_WIDTH_MM, self.slit_height_mm)
+        return {"dose_mJ_cm2": dose_mj_cm2, "P_wafer_W": p_wafer, "scan_speed_m_s": tl.scan_speed,
+                "limited_by": "source" if v_src < self.stage_limits.v_max else "stage",
+                "n_fields": tl.n_fields, "t_field_s": tl.t_field, "t_wafer_s": tl.t_wafer,
+                "WPH": tl.wafers_per_hour}
+
+    def overlay_budget_nm(self) -> float:
+        """Matched-machine overlay budget (RSS of |mean|+3σ terms, nm)."""
+        return matched_machine_overlay_budget().total * 1e9
+
+    def thermal_state(self) -> dict:
+        return self.environment.heating_state(self.source.inband_power_at_if_w())
 
     # -------------------------------------------------------------- patterning
     def print_lines(self, pitch_nm: float, cd_nm: float, dose_mj_cm2: Optional[float] = None,
@@ -143,6 +146,9 @@ class EUVScanner:
                  f"  POB T ({self.optics.n_mirrors} mirrors)      {b['T_POB']:8.3f}",
                  f"  power at wafer          {b['P_wafer_W']:8.2f} W  ({100 * b['IF_to_wafer']:.2f} % of IF)",
                  f"  @ {dose_mj_cm2:.0f} mJ/cm2: scan {t['scan_speed_m_s']:.3f} m/s "
-                 f"({t['limited_by']}-limited), {t['WPH']:.0f} wafers/h"]
+                 f"({t['limited_by']}-limited), {t['n_fields']} fields, {t['WPH']:.0f} wafers/h"]
+        th = self.thermal_state()
+        lines.append(f"  reticle heating         {th['reticle_dT_K']:8.1f} K  -> {th['reticle_overlay_nm']:.2f} nm overlay (uncorrected)")
+        lines.append(f"  matched-machine overlay {self.overlay_budget_nm():8.2f} nm")
         return "\n".join(lines)
 
